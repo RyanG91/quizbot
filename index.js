@@ -98,16 +98,94 @@ controller.hears(
     ['start', 'begin', 'go'],
     ['direct_message', 'direct_mention', 'mention'],
     function (bot, message) {
-        axios.get('https://opentdb.com/api.php?amount=1&type=multiple')
-            .then(function (response) {
-                bot.reply(message, 'Response => ' + JSON.stringify(response.data));
-            })
-            .catch(function (error) {
-                console.log(error);
-            });
-        bot.reply(message, 'Testing');
+        getQuiz().then(function(response) {
+            createQuestion(response, bot, message);
+        }).catch(function(error) {
+            console.log(error);
+        });
     }
 );
+
+
+function getQuiz() {
+    return new Promise(function(resolve, reject) {
+        axios.get('https://opentdb.com/api.php?amount=1&type=multiple')
+            .then(function (response) {
+                resolve(response.data);
+            })
+            .catch(function (error) {
+                reject(error);
+            });
+    });
+}
+
+function createQuestion(quizData, bot, message) {
+    var quizSubset = quizData.results[0];
+    if (quizSubset !== undefined) {
+        var options = [];
+
+        quizSubset.incorrect_answers.forEach(element => {
+            options.push({
+                answer: element, 
+                isCorrect: 0
+            });
+        });
+
+        options.push({
+            answer: quizSubset.correct_answer,
+            isCorrect: 1
+        });
+
+        // Shuffle options here
+
+        question = quizSubset.question;
+        question = question.replace(/&quot;/g, '\'');
+        question = question.replace(/&#039;/g, '\'');
+
+        quizComplete = {
+            question: question,
+            answers: [
+                {firstOption: options[0]},
+                {secondOption: options[1]},
+                {thirdOption: options[2]},
+                {fourthOption: options[3]}
+            ]
+        }
+
+        buttonList = [];
+        options.forEach(element => {
+            buttonList.push({
+                "name": element.answer,
+                "text": element.answer,
+                "value": element.isCorrect,
+                "type": "button",
+            });
+        });
+
+        bot.reply(message, {
+            attachments:[
+                {
+                    title: question,
+                    callback_id: 'quiz_select_answer',
+                    attachment_type: 'default',
+                    actions: buttonList
+                }
+            ]
+        });
+
+    }
+}
+
+// receive an interactive message, and reply with a message that will replace the original
+controller.on('interactive_message_callback', function(bot, message) {
+
+    // check message.actions and message.callback_id to see what action to take...
+    console.log(message.callback_id);
+    console.log(message.actions);
+
+    bot.reply(message, ':white_check_mark:');
+
+});
 
 
 /**
